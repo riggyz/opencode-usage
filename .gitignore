@@ -1,0 +1,16 @@
+node_modules/
+dist/*
+!dist/gui-experimental.cjs
+coverage/
+.cache/
+.DS_Store
+*.log
+.env
+.env.*
+*.pem
+*.key
+*.tgz
+auth.json
+credentials.json
+.cache-test-*/
+*.tsbuildinfo
