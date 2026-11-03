@@ -8,7 +8,9 @@ A small account-usage indicator for **OpenCode V2 desktop**, targeting its exper
 opencode plugin add github:riggyz/opencode-usage
 ```
 
-The repository includes the prebuilt desktop bundle: no clone or install-time build is needed. Pin a published release with `github:riggyz/opencode-usage#v0.1.0`.
+The repository includes the prebuilt desktop bundle: no clone or install-time build is needed. Pin a published release with `github:riggyz/opencode-usage#<release-tag>`. The original `v0.1.0` tag predates the Git-install fix; use the unpinned command above until a fixed release is published.
+
+The development build command is named `build:gui` deliberately: npm treats a script named `build` as a Git dependency preparation trigger, even when install scripts are disabled. Keeping the committed bundle and avoiding preparation hooks lets OpenCode install directly from GitHub.
 
 ```sh
 opencode plugin check
@@ -34,7 +36,7 @@ Requires Bun **1.3.14+** and OpenCode V2 **2.2.4**.
 ```sh
 bun install --frozen-lockfile
 bun run check
-bun run build
+bun run build:gui
 ```
 
 `bun run dev` watches the GUI bundle. **Commit `dist/gui-experimental.cjs` with source changes**, as in `opencode-pets`, so GitHub installations work without build hooks. CI rejects a stale bundle and checks formatting, types, mocked tests and high/critical dependency advisories. See `SECURITY.md` for known moderate SDK findings.
