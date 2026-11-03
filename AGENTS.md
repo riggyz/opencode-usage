@@ -9,5 +9,5 @@ Personal OpenCode **V2 desktop** plugin. Read README.md before changing provider
 - Claude direct OAuth polling is not enabled. Default observation reads only allowlisted quota headers from existing OpenCode Claude responses; the optional status-line bridge remains available. Never read a response body for quota observation.
 - A Codex weekly-only plan uses a wide weekly arc spanning both track bounds. Keep two thin tracks when a 5-hour window is reported; do not widen Claude or draw an invented Codex 5-hour window.
 - Keep providers small and testable. No custom framework, generated copies of upstream SDKs, or DOM injection.
-- `bun install`, `bun run check`, `bun run build`. Commit the prebuilt `dist/gui-experimental.cjs` with source changes for GitHub installs; CI verifies it matches a rebuild. Do not commit or publish unless asked.
+- `bun install`, `bun run check`, `bun run build:gui`. Commit the prebuilt `dist/gui-experimental.cjs` with source changes for GitHub installs; CI verifies it matches a rebuild. Do not commit or publish unless asked.
 - Do not change global OpenCode or Claude Code config without making the intended change explicit to Ethan.

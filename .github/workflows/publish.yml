@@ -47,7 +47,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run check
-          bun run build
+          bun run build:gui
           git diff --exit-code -- dist/gui-experimental.cjs
           bun audit --audit-level=high
       - name: Create tag and GitHub release
