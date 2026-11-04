@@ -82,7 +82,7 @@ test("explicit quota selection resolves a saved connection without activating it
 describe("Codex credential/network boundary", () => {
   test("token-sharing is tested at the endpoint, not rejected solely by method ID", async () => {
     let calls = 0
-    const windows = await fetchCodexUsage(
+    const { windows } = await fetchCodexUsage(
       { ...credential, methodID: "chatgpt-token-sharing" },
       new AbortController().signal,
       request(() => {
@@ -122,7 +122,8 @@ describe("Codex credential/network boundary", () => {
       }),
       now,
     )
-    expect(result).toHaveLength(1)
+    expect(result.windows).toHaveLength(1)
+    expect(result.resetCredits).toBeUndefined()
     expect(count).toBe(1)
   })
   test("API keys and expired credentials never hit the network", async () => {
@@ -153,6 +154,63 @@ describe("Codex credential/network boundary", () => {
         expect(String(error)).not.toContain("SECRET RAW BODY")
       }
     }
+  })
+  test("reads reset-credit count and earliest available expiry, dropping identifiers", async () => {
+    const urls: string[] = []
+    const iso = (offset: number) => new Date(now + offset).toISOString()
+    const result = await fetchCodexUsage(
+      credential,
+      new AbortController().signal,
+      request((url, init) => {
+        urls.push(String(url))
+        expect(init?.redirect).toBe("error")
+        if (String(url).endsWith("/wham/usage"))
+          return json({ ...payload, rate_limit_reset_credits: { available_count: 2 } })
+        return json({
+          credits: [
+            { id: "c1", status: "available", expires_at: iso(7_200_000), profile_user_id: "@friend" },
+            { id: "c2", status: "available", expires_at: iso(3_600_000) },
+            { id: "c3", status: "redeemed", expires_at: iso(60_000) },
+            { id: "c4", status: "available", expires_at: iso(-60_000) },
+            { id: "c5", status: "available", expires_at: null },
+          ],
+          available_count: 2,
+        })
+      }),
+      now,
+    )
+    expect(urls).toEqual([
+      "https://chatgpt.com/backend-api/wham/usage",
+      "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits",
+    ])
+    expect(result.resetCredits).toEqual({ available: 2, expiresAt: now + 3_600_000 })
+    expect(JSON.stringify(result)).not.toContain("friend")
+  })
+  test("zero credits skip the detail request; detail failures keep the count", async () => {
+    let calls = 0
+    const zero = await fetchCodexUsage(
+      credential,
+      new AbortController().signal,
+      request(() => {
+        calls++
+        return json({ ...payload, rate_limit_reset_credits: { available_count: 0 } })
+      }),
+      now,
+    )
+    expect(calls).toBe(1)
+    expect(zero.resetCredits).toEqual({ available: 0, expiresAt: null })
+    const failed = await fetchCodexUsage(
+      credential,
+      new AbortController().signal,
+      request((url) =>
+        String(url).endsWith("/wham/usage")
+          ? json({ ...payload, rate_limit_reset_credits: { available_count: 1 } })
+          : new Response("SECRET RAW BODY", { status: 500 }),
+      ),
+      now,
+    )
+    expect(failed.windows).toHaveLength(1)
+    expect(failed.resetCredits).toEqual({ available: 1, expiresAt: null })
   })
   test("parses Retry-After seconds and HTTP dates", () => {
     expect(retryAfter("90", now)).toBe(now + 90_000)
