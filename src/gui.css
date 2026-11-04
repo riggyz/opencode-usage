@@ -66,6 +66,9 @@
   align-items: baseline;
   gap: 12px;
 }
+.usage-details__credits {
+  grid-template-columns: 1fr auto;
+}
 .usage-details__muted {
   display: block;
   font-size: 11px;

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { readFile } from "node:fs/promises"
 import { halfRingPath, ringWindows, tooltipWindows, weeklyTrack } from "../src/presentation"
-import type { ProviderSnapshot, QuotaWindow } from "../src/model"
+import { resetCreditsLabel, type ProviderSnapshot, type QuotaWindow } from "../src/model"
 
 const five: QuotaWindow = { id: "codex:primary", label: "5h", usedPercent: 56, durationMs: 18_000_000, resetsAt: null }
 const week: QuotaWindow = { ...five, id: "codex:secondary", label: "7d", usedPercent: 35, durationMs: 604_800_000 }
@@ -48,6 +48,20 @@ test("split paths place Claude above and Codex below the center with a visible g
     expect(halfRingPath("codex", radius)).toMatch(/^M [\d.]+ 11\.1 A/)
     expect(halfRingPath("claude", radius)).not.toContain("NaN")
   }
+})
+
+test("reset-credit tooltip shows a count and earliest expiry only when credits exist", () => {
+  expect(resetCreditsLabel(undefined, 0)).toBeUndefined()
+  expect(resetCreditsLabel({ available: 0, expiresAt: null }, 0)).toBeUndefined()
+  expect(resetCreditsLabel({ available: 1, expiresAt: null }, 0)).toEqual({
+    count: "1 reset",
+    expiry: undefined,
+  })
+  expect(resetCreditsLabel({ available: 2, expiresAt: 93_600_000 }, 0)).toEqual({
+    count: "2 resets",
+    expiry: "Earliest exp in 1d 2h",
+  })
+  expect(resetCreditsLabel({ available: 2, expiresAt: 10 }, 20)?.expiry).toBeUndefined()
 })
 
 test("toolbar/tooltip code contains no account labels, absolute timestamps or usage instructions", async () => {

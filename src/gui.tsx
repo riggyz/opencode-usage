@@ -2,7 +2,7 @@ import { Plugin, Slot, Style, type UiTooltipProps } from "@opencode/plugin/gui"
 import { For, Show, createSignal, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Usage } from "./rpc"
-import { Snapshot, isStale, resetLabel, type ProviderSnapshot } from "./model"
+import { Snapshot, isStale, resetCreditsLabel, resetLabel, type ProviderSnapshot } from "./model"
 import { SharedUsage, type UsageView } from "./usage-state"
 import css from "./gui.css?inline"
 import { halfRingPath, ringWindows, tooltipWindows, weeklyTrack } from "./presentation"
@@ -64,6 +64,16 @@ function Details(props: { state: UsageView; now: number }) {
               </For>
               <Show when={!quota()?.windows.length}>
                 <p class="usage-details__muted">Usage unavailable</p>
+              </Show>
+              <Show when={resetCreditsLabel(quota()?.resetCredits, props.now)}>
+                {(credits) => (
+                  <div class="usage-details__window usage-details__credits">
+                    <span>{credits().count}</span>
+                    <Show when={credits().expiry}>
+                      <span class="usage-details__muted">{credits().expiry}</span>
+                    </Show>
+                  </div>
+                )}
               </Show>
             </section>
           )
@@ -153,11 +163,14 @@ export default Plugin.define({
       setNow(time)
       const crossed =
         state.snapshot?.providers
-          .flatMap((item) =>
-            item.windows
+          .flatMap((item) => [
+            ...item.windows
               .filter((window) => window.resetsAt !== null && window.resetsAt <= time)
               .map((window) => `${item.provider}:${window.id}:${window.resetsAt}`),
-          )
+            ...(item.resetCredits?.expiresAt != null && item.resetCredits.expiresAt <= time
+              ? [`${item.provider}:reset-credits:${item.resetCredits.expiresAt}`]
+              : []),
+          ])
           .sort()
           .join("|") ?? ""
       if (crossed && crossed !== resetKey) {

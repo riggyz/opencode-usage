@@ -71,7 +71,7 @@ export class CodexCollector {
     let snapshot: ProviderSnapshot
     let delay: number
     try {
-      const windows = await fetchCodexUsage(await connection.resolve(), signal, this.request, now)
+      const { windows, resetCredits } = await fetchCodexUsage(await connection.resolve(), signal, this.request, now)
       if (signal.aborted) return { ...base, status: "unavailable", message: "Connection changed; refresh usage." }
       snapshot = {
         ...base,
@@ -80,6 +80,7 @@ export class CodexCollector {
         message: windows.length ? "Account quota · private Codex endpoint" : "No quota windows reported.",
         fetchedAt: this.now(),
         windows,
+        ...(resetCredits ? { resetCredits } : {}),
       }
       delay = 120_000
       this.failures = 0
@@ -95,7 +96,7 @@ export class CodexCollector {
         status: failure.status,
         message: failure.message,
         retryAt: failure.retryAt,
-        ...(authFailure ? { windows: [], fetchedAt: null } : {}),
+        ...(authFailure ? { windows: [], fetchedAt: null, resetCredits: undefined } : {}),
       }
       delay = authFailure ? 300_000 : Math.min(900_000, 30_000 * 2 ** Math.min(this.failures++, 5))
       delay = Math.max(delay, (failure.retryAt ?? 0) - this.now())

@@ -10,6 +10,13 @@ export const QuotaWindow = z.object({
 })
 export type QuotaWindow = z.infer<typeof QuotaWindow>
 
+// Earned Codex rate-limit resets. Absent means not reported, never zero.
+export const ResetCredits = z.object({
+  available: z.number().int().nonnegative(),
+  expiresAt: z.number().finite().nullable(),
+})
+export type ResetCredits = z.infer<typeof ResetCredits>
+
 export const ProviderSnapshot = z.object({
   provider: z.enum(["codex", "claude"]),
   source: z.enum(["codex-oauth-private", "claude-code-statusline", "claude-response-headers"]),
@@ -19,6 +26,7 @@ export const ProviderSnapshot = z.object({
   fetchedAt: z.number().finite().nullable(),
   retryAt: z.number().finite().nullable(),
   windows: z.array(QuotaWindow),
+  resetCredits: ResetCredits.optional(),
 })
 export type ProviderSnapshot = z.infer<typeof ProviderSnapshot>
 
@@ -32,14 +40,26 @@ export function durationLabel(ms: number | null, fallback: string): string {
   return `${Math.round(ms / 60_000)}m`
 }
 
+function countdown(at: number, now: number): string | null {
+  const minutes = Math.ceil((at - now) / 60_000)
+  if (minutes <= 0) return null
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ${minutes % 60}m`
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`
+}
+
 export function resetLabel(resetsAt: number | null, now: number): string {
   if (resetsAt === null) return "Reset time unavailable"
-  const minutes = Math.ceil((resetsAt - now) / 60_000)
-  if (minutes <= 0) return "Reset pending verification"
-  if (minutes < 60) return `Resets in ${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Resets in ${hours}h ${minutes % 60}m`
-  return `Resets in ${Math.floor(hours / 24)}d ${hours % 24}h`
+  const remaining = countdown(resetsAt, now)
+  return remaining ? `Resets in ${remaining}` : "Reset pending verification"
+}
+
+export function resetCreditsLabel(credits: ResetCredits | undefined, now: number) {
+  if (!credits?.available) return undefined
+  const count = `${credits.available} ${credits.available === 1 ? "reset" : "resets"}`
+  const remaining = credits.expiresAt === null ? null : countdown(credits.expiresAt, now)
+  return { count, expiry: remaining ? `Earliest exp in ${remaining}` : undefined }
 }
 
 export function isStale(snapshot: ProviderSnapshot, now: number): boolean {

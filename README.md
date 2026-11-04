@@ -25,7 +25,7 @@ Sign in/select the quota accounts separately as described below; installing the 
 - A subtle monochrome split ring, left of the native session-context toggle.
 - Claude occupies the top half; Codex the bottom. Each half can show a 5-hour outer track and a 7-day inner track. Only reported windows are drawn.
 - If Codex reports a weekly limit but no 5-hour limit, its weekly arc fills the combined thickness of both tracks.
-- Hover or focus for provider, window, percentage used and reset countdown. No email addresses, connection IDs, account names or extra instructions in the tooltip.
+- Hover or focus for provider, window, percentage used and reset countdown. When Codex reports earned rate-limit reset credits, the tooltip also shows how many are available and when the earliest one expires. No email addresses, connection IDs, account names or extra instructions in the tooltip.
 - Click to refresh. Data is global across chats/projects, with one poller per desktop window. Last observations persist across plugin reloads; restoring data never makes it appear newly fetched.
 - Unknown is not 0%. Stale/offline state is marked without flashing or changing provider colors.
 
@@ -69,7 +69,7 @@ OpenCode watches config; local GUI rebuilds reload automatically. Use `/reload` 
 
 ## How usage is obtained
 
-**Codex:** OpenCode resolves a saved native Codex OAuth connection, and the server reads `https://chatgpt.com/backend-api/wham/usage`. This endpoint is private and can change. The newer ChatGPT token-sharing inference login returned HTTP 401 from that endpoint, so monitoring uses a separate standard Codex login. No separate Codex CLI or token lifecycle is implemented here.
+**Codex:** OpenCode resolves a saved native Codex OAuth connection, and the server reads `https://chatgpt.com/backend-api/wham/usage`. This endpoint is private and can change. The newer ChatGPT token-sharing inference login returned HTTP 401 from that endpoint, so monitoring uses a separate standard Codex login. When the usage response reports `rate_limit_reset_credits.available_count` above zero, the server also reads `/wham/rate-limit-reset-credits` and keeps only the earliest expiry of an available credit; credit IDs and referral profile fields are discarded. No separate Codex CLI or token lifecycle is implemented here.
 
 **Claude:** ordinary OpenCode Claude responses supply allowlisted subscription usage/reset headers. Observation is passive: no extra Anthropic requests, prompts, response-body reads or credential access. It updates when Claude is used and cannot guarantee freshness after usage elsewhere.
 
@@ -108,7 +108,7 @@ Set `options.claudeStatuslineFile` to the same absolute cache path. Compose with
 
 ## Limits and references
 
-The rings represent the reported 5-hour/7-day account windows, not session tokens or an aggregate balance. Other reported windows remain in the tooltip. Missing windows are not invented; reset expiry never zeroes usage without a fresh observation. Credits and spending/reset-credit actions are out of scope.
+The rings represent the reported 5-hour/7-day account windows, not session tokens or an aggregate balance. Other reported windows remain in the tooltip. Missing windows are not invented; reset expiry never zeroes usage without a fresh observation. Reset credits are display-only: the plugin never redeems one, and their expiry does not change any window. Spending credits are out of scope.
 
 - https://opencode.ai/v2/docs/build/plugins/gui
 - https://opencode.ai/v2/docs/build/plugins/server#integrations

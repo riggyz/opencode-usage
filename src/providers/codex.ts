@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { durationLabel, type QuotaWindow, type ProviderSnapshot } from "../model"
+import { durationLabel, type QuotaWindow, type ProviderSnapshot, type ResetCredits } from "../model"
 
 const Window = z.object({
   used_percent: z.number().finite(),
@@ -12,7 +12,27 @@ const Payload = z.object({
   additional_rate_limits: z
     .array(z.object({ limit_name: z.string(), metered_feature: z.string(), rate_limit: Limit }))
     .nullish(),
+  rate_limit_reset_credits: z.object({ available_count: z.number().int().nonnegative() }).nullish(),
 })
+// Only availability and expiry; credit IDs and referral profile fields are dropped.
+const CreditList = z.object({
+  credits: z.array(z.object({ status: z.string(), expires_at: z.string().nullish() })),
+})
+
+export function parseResetCreditsSummary(value: unknown): number | undefined {
+  const result = Payload.safeParse(value)
+  return result.success ? result.data.rate_limit_reset_credits?.available_count : undefined
+}
+
+export function earliestCreditExpiry(value: unknown, now: number): number | null {
+  const result = CreditList.safeParse(value)
+  if (!result.success) return null
+  const expiries = result.data.credits
+    .filter((credit) => credit.status === "available" && credit.expires_at)
+    .map((credit) => Date.parse(credit.expires_at!))
+    .filter((at) => Number.isFinite(at) && at > now)
+  return expiries.length ? Math.min(...expiries) : null
+}
 
 export function parseCodexUsage(value: unknown): QuotaWindow[] {
   const data = Payload.parse(value)
@@ -78,7 +98,7 @@ export async function fetchCodexUsage(
   signal: AbortSignal,
   request: typeof fetch = fetch,
   now = Date.now(),
-): Promise<QuotaWindow[]> {
+): Promise<{ windows: QuotaWindow[]; resetCredits?: ResetCredits }> {
   const result = OAuth.safeParse(credential)
   if (!result.success) {
     const kind = z
@@ -120,9 +140,26 @@ export async function fetchCodexUsage(
       "Codex usage service is unavailable.",
       retryAfter(response.headers.get("Retry-After"), now),
     )
+  let body: unknown
+  let windows: QuotaWindow[]
   try {
-    return parseCodexUsage(await response.json())
+    body = await response.json()
+    windows = parseCodexUsage(body)
   } catch {
     throw new UsageFailure("unavailable", "Codex returned an unrecognized usage response.")
   }
+  const available = parseResetCreditsSummary(body)
+  if (available === undefined) return { windows }
+  if (available === 0) return { windows, resetCredits: { available, expiresAt: null } }
+  // Expiry is optional detail; failing to read it never hides the count or fails usage.
+  let expiresAt: number | null = null
+  try {
+    const details = await request("https://chatgpt.com/backend-api/wham/rate-limit-reset-credits", {
+      headers,
+      signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+      redirect: "error",
+    })
+    if (details.ok) expiresAt = earliestCreditExpiry(await details.json(), now)
+  } catch {}
+  return { windows, resetCredits: { available, expiresAt } }
 }
