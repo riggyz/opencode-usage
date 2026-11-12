@@ -16,8 +16,26 @@ const Payload = z.object({
 })
 // Only availability and expiry; credit IDs and referral profile fields are dropped.
 const CreditList = z.object({
-  credits: z.array(z.object({ status: z.string(), expires_at: z.string().nullish() })),
+  credits: z.array(
+    z.object({ status: z.string(), expires_at: z.string().nullish(), reset_type: z.string().optional() }),
+  ),
 })
+
+export function parseCreditGroups(value: unknown): ResetCredits["groups"] {
+  const result = CreditList.safeParse(value)
+  if (!result.success) return undefined
+  const groups = new Map<string, { type: string; available: number; expirations: (number | null)[] }>()
+  for (const credit of result.data.credits) {
+    if (credit.status !== "available") continue
+    const type = credit.reset_type || "Reset"
+    const group = groups.get(type) ?? { type, available: 0, expirations: [] }
+    const expiry = credit.expires_at ? Date.parse(credit.expires_at) : NaN
+    group.available++
+    group.expirations.push(Number.isFinite(expiry) ? expiry : null)
+    groups.set(type, group)
+  }
+  return [...groups.values()].sort((a, b) => a.type.localeCompare(b.type))
+}
 
 export function parseResetCreditsSummary(value: unknown): number | undefined {
   const result = Payload.safeParse(value)
@@ -153,13 +171,20 @@ export async function fetchCodexUsage(
   if (available === 0) return { windows, resetCredits: { available, expiresAt: null } }
   // Expiry is optional detail; failing to read it never hides the count or fails usage.
   let expiresAt: number | null = null
+  let groups: ResetCredits["groups"]
   try {
     const details = await request("https://chatgpt.com/backend-api/wham/rate-limit-reset-credits", {
       headers,
       signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
       redirect: "error",
     })
-    if (details.ok) expiresAt = earliestCreditExpiry(await details.json(), now)
+    if (details.ok) {
+      const body: unknown = await details.json()
+      expiresAt = earliestCreditExpiry(body, now)
+      const parsed = parseCreditGroups(body)
+      // Do not present a partial/type breakdown as the authoritative summary.
+      if (parsed?.reduce((sum, group) => sum + group.available, 0) === available) groups = parsed
+    }
   } catch {}
-  return { windows, resetCredits: { available, expiresAt } }
+  return { windows, resetCredits: { available, expiresAt, ...(groups ? { groups } : {}) } }
 }

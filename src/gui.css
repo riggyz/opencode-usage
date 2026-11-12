@@ -44,30 +44,46 @@
   font-size: 12px;
   text-align: left;
 }
+.usage-details--quota {
+  display: grid;
+  grid-template-columns: minmax(20px, auto) max-content max-content;
+  column-gap: 12px;
+}
+.usage-details__provider {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
 .usage-details__provider + .usage-details__provider {
   margin-top: 12px;
 }
 .usage-details__heading {
+  grid-column: 1 / -1;
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: baseline;
+  gap: 8px;
 }
 .usage-details__heading strong {
   font-weight: 550;
 }
-.usage-details__heading > span,
 .usage-details__muted {
   opacity: 0.65;
 }
 .usage-details__window {
+  grid-column: 1 / -1;
   margin-top: 6px;
   display: grid;
-  grid-template-columns: minmax(20px, auto) auto auto;
+  grid-template-columns: subgrid;
   align-items: baseline;
-  gap: 12px;
+  column-gap: 12px;
 }
-.usage-details__credits {
-  grid-template-columns: 1fr auto;
+.usage-details__window > :nth-child(2),
+.usage-details__window > :nth-child(3) {
+  justify-self: end;
+  text-align: right;
+}
+.usage-details__provider > p {
+  grid-column: 1 / -1;
 }
 .usage-details__muted {
   display: block;
@@ -76,4 +92,43 @@
 }
 .usage-details p {
   margin: 6px 0 0;
+}
+.usage-warning {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #d98c2526;
+  color: #d98c25;
+  font-size: 10px;
+  font-weight: 650;
+}
+.usage-resets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  margin-left: auto;
+  color: color-mix(in srgb, currentColor 65%, transparent);
+}
+.usage-reset-chip {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: default;
+}
+.usage-reset-chip:focus-visible,
+.usage-warning:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
 }

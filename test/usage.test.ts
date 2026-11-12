@@ -489,7 +489,7 @@ describe("passive Claude quota observation", () => {
 
 test("countdown expiry never claims refreshed allowance", () => {
   expect(resetLabel(null, now)).toBe("Reset time unavailable")
-  expect(resetLabel(now - 1, now)).toBe("Reset pending verification")
-  expect(resetLabel(now + 61_000, now)).toBe("Resets in 2m")
-  expect(resetLabel(now + 90 * 60_000, now)).toBe("Resets in 1h 30m")
+  expect(resetLabel(now - 1, now)).toBe("Reset pending")
+  expect(resetLabel(now + 61_000, now)).toBe("2m")
+  expect(resetLabel(now + 90 * 60_000, now)).toBe("1h 30m")
 })

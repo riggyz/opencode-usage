@@ -8,11 +8,13 @@ import { Usage } from "./rpc"
 import type { ProviderSnapshot } from "./model"
 import { codexHost, listQuotaConnections } from "./connections"
 import { SnapshotCache } from "./snapshot-cache"
+import { ClaudeInventory } from "./providers/claude-inventory"
 
 const Options = z.object({
   codex: z.boolean().default(true),
   codexConnectionID: z.string().optional(),
   claude: z.boolean().default(true),
+  claudeResetInventory: z.boolean().default(false),
   claudeStatuslineFile: z.string().refine(isAbsolute, "Claude feed path must be absolute").optional(),
 })
 
@@ -37,12 +39,14 @@ export default Plugin.define({
       },
     }
     const collector = new CodexCollector(quotaHost)
+    const claudeInventory = new ClaudeInventory()
     const activeClaude = async () => {
       const connection = await ctx.integration.connection.active("anthropic")
       if (!connection) return undefined
       return {
         key: connection.type === "credential" ? connection.id : `env:${connection.name}`,
         label: connection.type === "credential" ? connection.label : "Environment connection",
+        resolve: () => ctx.integration.connection.resolve(connection),
       }
     }
     const requests = new WeakMap<Request, Awaited<ReturnType<typeof activeClaude>>>()
@@ -88,7 +92,7 @@ export default Plugin.define({
         selectedID = input.id
         return { selected: true }
       },
-      claudeDiagnostics: async () => ({ ...claudeObserver.diagnostics }),
+      claudeDiagnostics: async () => ({ ...claudeObserver.diagnostics, inventory: { ...claudeInventory.diagnostics } }),
       async snapshot(input) {
         const providers: ProviderSnapshot[] = []
         if (options.codex) {
@@ -114,13 +118,26 @@ export default Plugin.define({
               ? { ...saved, accountLabel: account!.label }
               : local
           const feed = options.claudeStatuslineFile ? await readClaudeFeed(options.claudeStatuslineFile) : undefined
-          providers.push(observed.windows.length ? observed : (feed ?? observed))
+          const snapshot = observed.windows.length ? observed : (feed ?? observed)
+          if (options.claudeResetInventory && account) {
+            const inventory = await claudeInventory.read(account.key, account.resolve)
+            // Never merge inventory into a different account or an unverified status-line feed.
+            const current = await activeClaude().catch(() => undefined)
+            if (current?.key === account.key && snapshot.source === "claude-response-headers") {
+              providers.push({
+                ...snapshot,
+                ...(inventory.credits ? { resetCredits: inventory.credits } : {}),
+                resetInventoryStatus: inventory.status,
+              })
+            } else providers.push(snapshot)
+          } else providers.push(snapshot)
         }
         return { providers }
       },
     })
     return async () => {
       collector.dispose()
+      claudeInventory.dispose()
       await requestHook?.dispose()
       await responseHook?.dispose()
       await registration.dispose()
