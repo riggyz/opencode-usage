@@ -14,7 +14,21 @@ export const Usage = Rpc.define({
     },
     claudeDiagnostics: {
       input: z.object({}),
-      output: z.object({ requests: z.number(), responses: z.number(), bound: z.number(), quota: z.number() }),
+      output: z.object({
+        requests: z.number(),
+        responses: z.number(),
+        bound: z.number(),
+        quota: z.number(),
+        inventory: z
+          .object({
+            httpStatus: z.number().nullable(),
+            inventoryPresent: z.boolean(),
+            eligible: z.boolean().nullable(),
+            surfaceRestricted: z.boolean(),
+            grantRecords: z.number().nullable(),
+          })
+          .optional(),
+      }),
     },
     snapshot: {
       input: z.object({ refresh: z.boolean().optional() }),
